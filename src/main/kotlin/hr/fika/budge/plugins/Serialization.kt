@@ -1,4 +1,4 @@
-package hr.fika.plugins
+package hr.fika.budge.plugins
 
 import io.ktor.serialization.gson.*
 import io.ktor.server.plugins.contentnegotiation.*

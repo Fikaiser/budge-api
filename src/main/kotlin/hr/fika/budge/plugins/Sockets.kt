@@ -1,4 +1,4 @@
-package hr.fika.plugins
+package hr.fika.budge.plugins
 
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
@@ -9,12 +9,8 @@ import kotlinx.coroutines.runBlocking
 import java.io.InputStream
 import java.util.*
 import io.ktor.server.application.*
-import io.ktor.server.response.*
-import io.ktor.server.request.*
 
 fun Application.configureSockets() {
-
-
 }
 /**
  * Two mains are provided, you must first start EchoApp.Server, and then EchoApp.Client.

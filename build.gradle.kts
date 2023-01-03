@@ -1,6 +1,11 @@
 val ktor_version: String by project
 val kotlin_version: String by project
 val logback_version: String by project
+val exposedVersion: String by project
+val postgresVersion: String by project
+val retrofitVersion: String by project
+val gsonVersion: String by project
+val okHttpVersion: String by project
 
 plugins {
     application
@@ -33,4 +38,22 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:$logback_version")
     testImplementation("io.ktor:ktor-server-tests-jvm:$ktor_version")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:$kotlin_version")
+
+    // Database Access - Exposed
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+
+    // Postgres JDBC driver
+    implementation("org.postgresql:postgresql:$postgresVersion")
+
+    // Retrofit
+    implementation("com.squareup.retrofit2:retrofit:$retrofitVersion")
+    implementation("com.squareup.retrofit2:converter-gson:$retrofitVersion")
+
+    // Gson
+    implementation("com.google.code.gson:gson:$gsonVersion")
+
+    // OkHttp
+    implementation("com.squareup.okhttp3:okhttp:$okHttpVersion")
 }

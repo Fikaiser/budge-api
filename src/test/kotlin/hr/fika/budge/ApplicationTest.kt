@@ -1,4 +1,4 @@
-package hr.fika
+package hr.fika.budge
 
 import io.ktor.server.routing.*
 import io.ktor.http.*
@@ -18,6 +18,7 @@ import io.ktor.server.auth.jwt.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.JWTVerifier
 import com.auth0.jwt.algorithms.Algorithm
+import hr.fika.budge.plugins.configureRouting
 import io.ktor.server.locations.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*

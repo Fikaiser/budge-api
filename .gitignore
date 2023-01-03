@@ -34,3 +34,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Project files ###
+/server.properties
+/src/main/kotlin/hr/fika/budge/Secrets.kt
