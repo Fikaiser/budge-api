@@ -1,7 +1,7 @@
 package hr.fika.budge.dal.crypto
 
 import hr.fika.budge.COINRANKING_API_HOST
-import hr.fika.budge.COINRANKING_API_KEY
+import hr.fika.budge.RAPIDAPI_API_KEY
 import hr.fika.budge.EUR_ID
 import hr.fika.budge.models.crypto.CoinHistoryResponse
 import hr.fika.budge.models.crypto.CoinPriceResponse
@@ -15,14 +15,14 @@ const val SEVEN_DAYS = "7d"
 const val MONTH = "30d"
 const val YEAR = "1y"
 interface CoinApi {
-    @Headers("X-RapidAPI-Key: $COINRANKING_API_KEY", "X-RapidAPI-Host: $COINRANKING_API_HOST")
+    @Headers("X-RapidAPI-Key: $RAPIDAPI_API_KEY", "X-RapidAPI-Host: $COINRANKING_API_HOST")
     @GET("/coin/{tag}/price")
     suspend fun getCoinPrice(
         @Path("tag") tag: String,
         @Query("referenceCurrencyUuid") currency: String = EUR_ID
     ): Response<CoinPriceResponse>
 
-    @Headers("X-RapidAPI-Key: $COINRANKING_API_KEY", "X-RapidAPI-Host: $COINRANKING_API_HOST")
+    @Headers("X-RapidAPI-Key: $RAPIDAPI_API_KEY", "X-RapidAPI-Host: $COINRANKING_API_HOST")
     @GET("/coin/{tag}/history")
     suspend fun getHistoricalPrice(
         @Path("tag") tag: String,
