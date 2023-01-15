@@ -20,8 +20,9 @@ import java.util.concurrent.TimeUnit
 
 fun Application.configureRouting() {
     routing {
-        get("/") {
-            var text = "asd"
+
+        get("/test") {
+            var text = "Hello from API"
             call.respondText(text)
         }
 
@@ -46,7 +47,8 @@ fun Application.configureRouting() {
                         .withClaim("username", "username")
                         .withExpiresAt(Date(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(45)))
                         .sign(Algorithm.HMAC256(JwtSecrets.SECRET.value))
-                    call.respond(hashMapOf("token" to token))
+                    // call.respond(hashMapOf("token" to token))
+                    call.respondText(token)
                 } else {
                     call.respondText(status = HttpStatusCode.BadRequest, text = "Such user not found")
                 }
