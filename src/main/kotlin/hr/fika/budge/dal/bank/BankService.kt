@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.StdOutSqlLogger
 import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.Instant
 import java.time.LocalDate
 import kotlin.random.Random
 
@@ -35,7 +36,7 @@ object BankService {
                 commit()
                 DbTransaction.new {
                     description = "Initial balance"
-                    transactionDate = LocalDate.now()
+                    transactionTimestamp = Instant.now()
                     amount = (1000.00).toBigDecimal()
                     reoccurring = false
                     this.accountId = account.idBankAccount!!
@@ -87,7 +88,7 @@ object BankService {
             SchemaUtils.create(Transactions)
             DbTransaction.new {
                 description = "Transaction"
-                transactionDate = LocalDate.now()
+                transactionTimestamp = Instant.now()
                 amount = Random.nextDouble(-100.00, 100.00).toBigDecimal()
                 reoccurring = false
                 this.accountId = accountId

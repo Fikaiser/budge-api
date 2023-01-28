@@ -57,4 +57,7 @@ dependencies {
 
     // OkHttp
     implementation("com.squareup.okhttp3:okhttp:$okHttpVersion")
+
+    // Encryption
+    implementation ("com.password4j:password4j:1.6.3")
 }

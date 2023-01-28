@@ -39,26 +39,27 @@ fun Application.configureRouting() {
         post("/login") {
             val params = call.request.queryParameters
             val email = params["email"]
-            val hash = params["hash"]
+            val pass = params["pass"]
             var user: DbUser? = null
 
-            if (!email.isNullOrBlank() && !hash.isNullOrBlank()) {
+            if (!email.isNullOrBlank() && !pass.isNullOrBlank()) {
                 transaction(DatabaseProvider.provideDb()) {
                     SchemaUtils.create(Users)
                     val dbUser = DbUser.find { Users.email like email }.firstOrNull()
-                    if (dbUser != null && dbUser.passHash == hash) {
+                    if (dbUser != null && dbUser.passHash == pass) {
                         user = dbUser
                     }
                 }
                 if (user != null) {
+                    val account = BankService.getBankAccount(user!!.idUser.value)
                     val token = JWT.create()
                         .withAudience(JwtSecrets.AUDIENCE.value)
                         .withIssuer(JwtSecrets.ISSUER.value)
-                        .withClaim("username", "username")
+                        .withClaim("username", user!!.nickname)
                         .withExpiresAt(Date(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(45)))
                         .sign(Algorithm.HMAC256(JwtSecrets.SECRET.value))
                     // call.respond(hashMapOf("token" to token))
-                    val response = User(user!!.idUser.value, user!!.nickname, token)
+                    val response = User(user!!.idUser.value, user!!.nickname, token, bankAccount = account)
                     call.respond(response)
                 } else {
                     call.respondText(status = HttpStatusCode.BadRequest, text = "Such user not found")
@@ -73,15 +74,15 @@ fun Application.configureRouting() {
             val params = call.request.queryParameters
             val nickname = params["nickname"]
             val email = params["email"]
-            val hash = params["hash"]
+            val pass = params["pass"]
 
-            if (!nickname.isNullOrBlank() && !email.isNullOrBlank() && !hash.isNullOrBlank()) {
+            if (!nickname.isNullOrBlank() && !email.isNullOrBlank() && !pass.isNullOrBlank()) {
                 transaction(DatabaseProvider.provideDb()) {
                     SchemaUtils.create(Users)
                     DbUser.new {
                         this.nickname = nickname
                         this.email = email
-                        this.passHash = hash
+                        this.passHash = pass
                     }
                 }
                 call.respondText("Added")
@@ -115,6 +116,15 @@ fun Application.configureRouting() {
                     } else {
                         call.respond("")
                     }
+                }
+            }
+
+            get("/transactions") {
+                val params = call.request.queryParameters
+                val bankAccountId = params["bankAccountId"]?.toInt()
+                bankAccountId?.let {
+                    val transactions = BankService.getTransactions(it)
+                    call.respond(transactions)
                 }
             }
 
