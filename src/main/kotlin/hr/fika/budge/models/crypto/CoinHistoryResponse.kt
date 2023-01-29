@@ -5,7 +5,9 @@ import com.google.gson.annotations.SerializedName
 data class CoinHistoryResponse(
     @SerializedName("status") var status: String? = null,
     @SerializedName("data") var data: CoinHistoryData? = CoinHistoryData()
-)
+) {
+    fun toHistoricalCoinPrice() = HistoricalCoinPrice(data!!.change!!.toDouble(), data!!.history.toList())
+}
 
 data class CoinHistoryData(
     @SerializedName("change") var change: String? = null,

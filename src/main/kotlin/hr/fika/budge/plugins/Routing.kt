@@ -5,7 +5,12 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import hr.fika.budge.JwtSecrets
 import hr.fika.budge.dal.bank.BankService
+import hr.fika.budge.dal.crypto.CoinRepository
+import hr.fika.budge.dal.crypto.CryptoService
 import hr.fika.budge.dal.db.DatabaseProvider
+import hr.fika.budge.dal.stock.StockRepository
+import hr.fika.budge.dal.stock.StockService
+import hr.fika.budge.models.bank.Transaction
 import hr.fika.budge.models.user.DbUser
 import hr.fika.budge.models.user.User
 import hr.fika.budge.models.user.Users
@@ -13,6 +18,7 @@ import io.ktor.http.*
 import io.ktor.server.routing.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -32,7 +38,7 @@ fun Application.configureRouting() {
         }
 
         get("/test") {
-            var text = "Hello from API"
+            val text = "Hello from API"
             call.respondText(text)
         }
 
@@ -52,14 +58,21 @@ fun Application.configureRouting() {
                 }
                 if (user != null) {
                     val account = BankService.getBankAccount(user!!.idUser.value)
+                    val wallet = CryptoService.getCryptoWallet(user!!.idUser.value)
+                    val portfolio = StockService.getStockPortfolio(user!!.idUser.value)
                     val token = JWT.create()
                         .withAudience(JwtSecrets.AUDIENCE.value)
                         .withIssuer(JwtSecrets.ISSUER.value)
                         .withClaim("username", user!!.nickname)
                         .withExpiresAt(Date(System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(45)))
                         .sign(Algorithm.HMAC256(JwtSecrets.SECRET.value))
-                    // call.respond(hashMapOf("token" to token))
-                    val response = User(user!!.idUser.value, user!!.nickname, token, bankAccount = account)
+                    val response = User(
+                        user!!.idUser.value,
+                        user!!.nickname,
+                        token,
+                        bankAccount = account,
+                        cryptoWalletId = wallet!!.idWallet,
+                        stockPortfolioId = portfolio!!.idStockPortfolio)
                     call.respond(response)
                 } else {
                     call.respondText(status = HttpStatusCode.BadRequest, text = "Such user not found")
@@ -128,6 +141,26 @@ fun Application.configureRouting() {
                 }
             }
 
+            post("/transactions") {
+                val transaction = call.receive(Transaction::class)
+                BankService.addTransaction(transaction)
+            }
+
+            delete("/transactions") {
+                val params = call.request.queryParameters
+                val transactionId = params["transactionId"]?.toInt()
+                BankService.deleteTransaction(transactionId!!)
+            }
+
+            get("/flow") {
+                val params = call.request.queryParameters
+                val bankAccountId = params["bankAccountId"]?.toInt()
+                bankAccountId?.let {
+                    val transactions = BankService.getFlow(it)
+                    call.respond(transactions)
+                }
+            }
+
             post("/bankaccount") {
                 val params = call.request.queryParameters
                 val userId = params["userId"]?.toInt()
@@ -140,6 +173,124 @@ fun Application.configureRouting() {
                 }
                 call.respond("")
             }
+
+            post("/wallet") {
+                val params = call.request.queryParameters
+                val userId = params["userId"]?.toInt()
+                if (userId != null) {
+                    val wallet = CryptoService.registerCryptoWallet(userId)
+                    if (wallet.idWallet != null) {
+                        call.respond(wallet)
+                    }
+                }
+                call.respond("")
+            }
+
+            get("/wallet") {
+                val params = call.request.queryParameters
+                val userId = params["userId"]?.toInt()
+                userId?.let {
+                    val wallet = CryptoService.getCryptoWallet(it)
+                    if (wallet != null) {
+                        call.respond(wallet)
+                    } else {
+                        call.respond("")
+                    }
+                }
+            }
+
+            get("/cryptobalance") {
+                val params = call.request.queryParameters
+                val walletId = params["walletId"]?.toInt()
+                walletId?.let {
+                    val balances = CryptoService.getCryptoBalances(it)
+                    balances.forEach { balance ->
+                        balance.price = CoinRepository.getCoinPrice(balance.tag!!)
+                    }
+                    call.respond(balances)
+                }
+            }
+
+            get("/cryptohistory") {
+                val params = call.request.queryParameters
+                val tag = params["tag"]
+                val period = params["period"]
+                if (tag != null && period != null) {
+                    val history = CoinRepository.getCoinPriceHistory(tag, period )
+                    history?.let {
+                        call.respond(it)
+                    }
+                }
+            }
+
+            post("/portfolio") {
+                val params = call.request.queryParameters
+                val userId = params["userId"]?.toInt()
+                if (userId != null) {
+                    val portfolio = StockService.registerStockPortfolio(userId)
+                    if (portfolio.idStockPortfolio != null) {
+                        call.respond(portfolio)
+                    }
+                }
+                call.respond("")
+            }
+
+            get("/portfolio") {
+                val params = call.request.queryParameters
+                val userId = params["userId"]?.toInt()
+                userId?.let {
+                    val portfolio = StockService.getStockPortfolio(it)
+                    if (portfolio != null) {
+                        call.respond(portfolio)
+                    } else {
+                        call.respond("")
+                    }
+                }
+            }
+
+            get("/stockbalance") {
+                val params = call.request.queryParameters
+                val portfolioId = params["portfolioId"]?.toInt()
+                portfolioId?.let {
+                    val balances = StockService.getStockBalances(it)
+                    balances.forEach { balance ->
+                        balance.price = StockRepository.getStockPrice(balance.tag!!)
+                    }
+                    call.respond(balances)
+                }
+            }
+
+            get("/stockhistory") {
+                val params = call.request.queryParameters
+                val tag = params["tag"]
+                val interval = params["interval"]
+                if (tag != null && interval != null) {
+                    // TODO THIS IS WRONG!!!
+
+                    var realInterval = ""
+                    var outputSize = 0
+                    when (interval) {
+                        "day" -> {
+                            realInterval = "1h"
+                            outputSize = 24
+                        }
+                        "week" -> {
+                            realInterval = "1day"
+                            outputSize = 7
+                        }
+                        "month" -> {
+                            realInterval = "1day"
+                            outputSize = 30
+                        }
+                        else -> {}
+                    }
+                    val history = StockRepository.getStockPriceHistory(tag, realInterval, outputSize)
+                    history?.let {
+                        call.respond(it)
+                    }
+                }
+            }
+
         }
     }
 }

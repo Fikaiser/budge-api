@@ -8,7 +8,6 @@ import org.jetbrains.exposed.sql.StdOutSqlLogger
 import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
-import java.time.LocalDate
 import kotlin.random.Random
 
 object BankService {
@@ -50,7 +49,7 @@ object BankService {
     }
 
     fun getBankAccount(userId: Int): BankAccount? {
-        var account : BankAccount? = null
+        var account: BankAccount? = null
         transaction(DatabaseProvider.provideDb()) {
             SchemaUtils.create(BankAccounts)
             val check = DbBankAccount.find { BankAccounts.userId eq userId }.toList()
@@ -79,6 +78,41 @@ object BankService {
             DbTransaction.find { Transactions.accountId eq accountId }.forEach { dbTransaction ->
                 list.add(dbTransaction.toTransaction())
             }
+        }
+        return list
+    }
+
+    fun addTransaction(transaction: Transaction) {
+        transaction(DatabaseProvider.provideDb()) {
+            SchemaUtils.create(Transactions)
+            DbTransaction.new {
+                description = transaction.description!!
+                amount = transaction.amount!!.toBigDecimal()
+                reoccurring = transaction.reoccurring!!
+                transactionTimestamp = Instant.ofEpochMilli(transaction.transactionTimestamp!!)
+                accountId = transaction.accountId!!
+
+            }
+        }
+    }
+
+    fun deleteTransaction(transactionId: Int) {
+        transaction(DatabaseProvider.provideDb()) {
+            SchemaUtils.create(Transactions)
+            DbTransaction.findById(transactionId)?.delete()
+        }
+    }
+
+    fun getFlow(accountId: Int): List<Transaction> {
+        val list = mutableListOf<Transaction>()
+        transaction(DatabaseProvider.provideDb()) {
+            addLogger(StdOutSqlLogger)
+            SchemaUtils.create(Transactions)
+            DbTransaction.find { Transactions.accountId eq accountId }
+                .filter { it.reoccurring }
+                .forEach { dbTransaction ->
+                    list.add(dbTransaction.toTransaction())
+                }
         }
         return list
     }

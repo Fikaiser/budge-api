@@ -6,7 +6,9 @@ data class HistoricalStockPriceResponse(
     @SerializedName("meta") var meta: StockMetaData? = StockMetaData(),
     @SerializedName("values") var values: ArrayList<HistoricalStockValues> = arrayListOf(),
     @SerializedName("status") var status: String? = null
-)
+) {
+    fun toHistoricalStockPrice() = HistoricalStockPrice(values.toList())
+}
 
 data class StockMetaData(
     @SerializedName("symbol") var symbol: String? = null,
