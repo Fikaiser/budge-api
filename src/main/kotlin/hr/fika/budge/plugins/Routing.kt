@@ -10,10 +10,12 @@ import hr.fika.budge.dal.crypto.CryptoService
 import hr.fika.budge.dal.db.DatabaseProvider
 import hr.fika.budge.dal.stock.StockRepository
 import hr.fika.budge.dal.stock.StockService
+import hr.fika.budge.models.bank.Budget
 import hr.fika.budge.models.bank.Transaction
 import hr.fika.budge.models.user.DbUser
 import hr.fika.budge.models.user.User
 import hr.fika.budge.models.user.Users
+import hr.fika.budge.utils.EncryptionManager
 import io.ktor.http.*
 import io.ktor.server.routing.*
 import io.ktor.server.application.*
@@ -29,17 +31,25 @@ import java.util.concurrent.TimeUnit
 fun Application.configureRouting() {
     routing {
 
-        get {
-            var text = ""
-            BankService.getBankAtmLocations(1).forEach { bank ->
-                text += bank
-            }
-            call.respondText(text)
-        }
-
         get("/test") {
             val text = "Hello from API"
             call.respondText(text)
+        }
+
+        get("/payment") {
+            val accountId = call.request.queryParameters["accountId"]
+            accountId?.let {
+                call.respond(BankService.getPendingPayment(it.toInt()))
+            }
+            call.respond(false)
+        }
+
+        get("/overspend") {
+            val userId = call.request.queryParameters["userId"]
+            userId?.let {
+                call.respond(BankService.getOverspend(it.toInt()))
+            }
+            call.respond(false)
         }
 
         post("/login") {
@@ -52,7 +62,7 @@ fun Application.configureRouting() {
                 transaction(DatabaseProvider.provideDb()) {
                     SchemaUtils.create(Users)
                     val dbUser = DbUser.find { Users.email like email }.firstOrNull()
-                    if (dbUser != null && dbUser.passHash == pass) {
+                    if (dbUser != null && EncryptionManager.verifyPassword(pass, dbUser.passHash)) {
                         user = dbUser
                     }
                 }
@@ -71,8 +81,8 @@ fun Application.configureRouting() {
                         user!!.nickname,
                         token,
                         bankAccount = account,
-                        cryptoWalletId = wallet!!.idWallet,
-                        stockPortfolioId = portfolio!!.idStockPortfolio)
+                        cryptoWalletId = wallet?.idWallet,
+                        stockPortfolioId = portfolio?.idStockPortfolio)
                     call.respond(response)
                 } else {
                     call.respondText(status = HttpStatusCode.BadRequest, text = "Such user not found")
@@ -90,12 +100,14 @@ fun Application.configureRouting() {
             val pass = params["pass"]
 
             if (!nickname.isNullOrBlank() && !email.isNullOrBlank() && !pass.isNullOrBlank()) {
+
+                val hash = EncryptionManager.encryptPassword(pass)
                 transaction(DatabaseProvider.provideDb()) {
                     SchemaUtils.create(Users)
                     DbUser.new {
                         this.nickname = nickname
                         this.email = email
-                        this.passHash = pass
+                        this.passHash = hash
                     }
                 }
                 call.respondText("Added")
@@ -117,6 +129,10 @@ fun Application.configureRouting() {
                     call.respond(locations)
                 }
 
+            }
+
+            get("/banks") {
+                call.respond(BankService.getAllBanks())
             }
 
             get("/bankaccount") {
@@ -289,6 +305,31 @@ fun Application.configureRouting() {
                         call.respond(it)
                     }
                 }
+            }
+
+            get("/budgetcalculation"){
+                val params = call.request.queryParameters
+                val accountId = params["accountId"]
+                accountId?.let {
+                    val data = BankService.getBudgetCalculation(it.toInt())
+                    call.respond(data)
+                }
+                call.respond("Error")
+            }
+
+            get("/budgets") {
+                val params = call.request.queryParameters
+                val userId = params["userId"]?.toInt()
+                userId?.let {
+                    val budgets = BankService.getBudgets(it)
+                    call.respond(budgets)
+                }
+            }
+
+            post("/budgets") {
+                val budget = call.receive(Budget::class)
+                BankService.addBudget(budget)
+                call.respond("OK")
             }
 
         }

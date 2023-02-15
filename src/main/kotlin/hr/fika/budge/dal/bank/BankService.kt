@@ -8,14 +8,16 @@ import org.jetbrains.exposed.sql.StdOutSqlLogger
 import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import kotlin.random.Random
 
 object BankService {
-    fun getAllBanks(): List<DbBank> {
-        val list = mutableListOf<DbBank>()
+    fun getAllBanks(): List<Bank> {
+        val list = mutableListOf<Bank>()
         transaction(DatabaseProvider.provideDb()) {
             SchemaUtils.create(Banks)
-            list.addAll(DbBank.all().toList())
+            list.addAll(DbBank.all().map { it.toBank() })
         }
         return list
     }
@@ -117,6 +119,18 @@ object BankService {
         return list
     }
 
+    fun getPendingPayment(accountId: Int): Boolean {
+        val flow = getFlow(accountId)
+        flow.forEach { transaction ->
+            val paymentTimestamp = Instant.ofEpochMilli(transaction.transactionTimestamp!!)
+            val paymentDate = paymentTimestamp.atZone(ZoneId.systemDefault()).toLocalDate()
+            if (paymentDate.minusDays(3) == LocalDate.now()) {
+                return true
+            }
+        }
+        return false
+    }
+
     private fun generateTransactions(accountId: Int) {
         transaction(DatabaseProvider.provideDb()) {
             SchemaUtils.create(Transactions)
@@ -128,5 +142,79 @@ object BankService {
                 this.accountId = accountId
             }
         }
+    }
+
+    fun getBudgetCalculation(accountId: Int) : BudgetCalculationInfo {
+        val flow = getFlow(accountId)
+        val netMonthlyChange = flow.sumOf { transaction -> transaction.amount!! }
+        var total = 0.0
+        transaction(DatabaseProvider.provideDb()) {
+            SchemaUtils.create(Transactions)
+            DbTransaction.find { Transactions.accountId eq accountId }
+                .filter { !it.reoccurring }
+                .forEach { dbTransaction ->
+                    total += dbTransaction.amount.toDouble()
+                }
+        }
+        return BudgetCalculationInfo(flow, total, netMonthlyChange)
+    }
+
+    fun getBudgets(userID: Int): List<Budget> {
+        val list = mutableListOf<Budget>()
+        transaction(DatabaseProvider.provideDb()) {
+            SchemaUtils.create(Budgets)
+            DbBudget.find { Budgets.userId eq userID }
+                .forEach { dbBudget ->
+                    list.add(dbBudget.toBudget())
+                }
+        }
+        return list
+    }
+
+    fun addBudget(budget: Budget) {
+        transaction(DatabaseProvider.provideDb()) {
+            SchemaUtils.create(Budgets)
+            DbBudget.new {
+                description = budget.description!!
+                amount = budget.amount!!.toBigDecimal()
+                budgetDate = Instant.ofEpochMilli(budget.budgetDate!!)
+                userId = budget.userId!!
+            }
+        }
+    }
+
+    fun getOverspend(userId: Int): Boolean {
+        val accountId = getBankAccount(userId)
+        accountId?.let {
+            val projections = getBudgetsAndProjections(userId, it.idBankAccount!!)
+
+            return projections.count { budgetProjection -> !budgetProjection.isOnTarget } != 0
+        }
+        return false
+    }
+
+    fun getBudgetsAndProjections(userId: Int, accountId: Int): List<BudgetProjection> {
+        val budgets = getBudgets(userId)
+        val calcData = getBudgetCalculation(accountId)
+        return budgets.map { calculateBudgetProjection(it, calcData) }
+    }
+
+    private fun calculateBudgetProjection(budget: Budget, calculationInfo: BudgetCalculationInfo): BudgetProjection {
+        val targetDate = Instant.ofEpochMilli(budget.budgetDate!!).atZone(ZoneId.systemDefault()).toLocalDate()
+        var projection = 0.0
+        for (transaction in calculationInfo.flow) {
+            var comparisonDate = LocalDate.now()
+            val transactionDate = Instant.ofEpochMilli(transaction.transactionTimestamp!!).atZone(
+                ZoneId.systemDefault()).toLocalDate()
+            while (comparisonDate.isBefore(targetDate)) {
+                if (transactionDate.dayOfMonth < comparisonDate.dayOfMonth) {
+                    projection += transaction.amount!!
+                }
+                comparisonDate = comparisonDate.plusMonths(1)
+            }
+        }
+        val netChange = projection + calculationInfo.total
+        val comparisonToBudget = budget.amount!! - netChange
+        return BudgetProjection(budget, comparisonToBudget, comparisonToBudget >= 0)
     }
 }

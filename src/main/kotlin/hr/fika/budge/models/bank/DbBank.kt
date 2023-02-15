@@ -14,5 +14,7 @@ class DbBank(val idBank: EntityID<Int>) : IntEntity(idBank) {
 
     var name by Banks.name
 
+    fun toBank() = Bank(idBank.value, name)
+
     override fun toString() = "Bank ID - $idBank Name - $name"
 }
