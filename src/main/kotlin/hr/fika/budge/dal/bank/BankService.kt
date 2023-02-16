@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.StdOutSqlLogger
 import org.jetbrains.exposed.sql.addLogger
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.math.RoundingMode
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -196,16 +197,19 @@ object BankService {
     fun getBudgetsAndProjections(userId: Int, accountId: Int): List<BudgetProjection> {
         val budgets = getBudgets(userId)
         val calcData = getBudgetCalculation(accountId)
-        return budgets.map { calculateBudgetProjection(it, calcData) }
+        return budgets.map { calculateBudgetProjection(it, calcData, budgets) }
     }
 
-    private fun calculateBudgetProjection(budget: Budget, calculationInfo: BudgetCalculationInfo): BudgetProjection {
-        val targetDate = Instant.ofEpochMilli(budget.budgetDate!!).atZone(ZoneId.systemDefault()).toLocalDate()
+    private fun calculateBudgetProjection(
+        budget: Budget,
+        calculationInfo: BudgetCalculationInfo,
+        budgets: List<Budget>
+    ): BudgetProjection {
+        val targetDate = getLocalDateFromTimestamp(budget.budgetDate!!)
         var projection = 0.0
         for (transaction in calculationInfo.flow) {
             var comparisonDate = LocalDate.now()
-            val transactionDate = Instant.ofEpochMilli(transaction.transactionTimestamp!!).atZone(
-                ZoneId.systemDefault()).toLocalDate()
+            val transactionDate = getLocalDateFromTimestamp(transaction.transactionTimestamp!!)
             while (comparisonDate.isBefore(targetDate)) {
                 if (transactionDate.dayOfMonth < comparisonDate.dayOfMonth) {
                     projection += transaction.amount!!
@@ -213,8 +217,26 @@ object BankService {
                 comparisonDate = comparisonDate.plusMonths(1)
             }
         }
-        val netChange = projection + calculationInfo.total
-        val comparisonToBudget = budget.amount!! - netChange
+        // val budgetCalculation = budgets.sumOf { it.amount!! } - budget.amount!!
+        var budgetCalculation = 0.0
+        budgets.forEach { b ->
+            if (!getLocalDateFromTimestamp(b.budgetDate!!).isAfter(targetDate)) {
+                budgetCalculation += b.amount!!
+            }
+        }
+        val netChange = projection + calculationInfo.total - (budgetCalculation - budget.amount!!)
+        val comparisonToBudget = (netChange - budget.amount).toBigDecimal().setScale(2, RoundingMode.DOWN).toDouble()
         return BudgetProjection(budget, comparisonToBudget, comparisonToBudget >= 0)
+    }
+
+    fun deleteBudget(budgetId: Int) {
+        transaction(DatabaseProvider.provideDb()) {
+            SchemaUtils.create(Budgets)
+            DbBudget.findById(budgetId)?.delete()
+        }
+    }
+
+    private fun getLocalDateFromTimestamp(timestamp: Long) : LocalDate {
+        return Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
     }
 }

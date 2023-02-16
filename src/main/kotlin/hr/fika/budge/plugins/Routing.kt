@@ -137,9 +137,9 @@ fun Application.configureRouting() {
 
             get("/bankaccount") {
                 val params = call.request.queryParameters
-                val userId = params["userId"]?.let { it.toInt() }
+                val userId = params["userId"]
                 userId?.let {
-                    val account = BankService.getBankAccount(it)
+                    val account = BankService.getBankAccount(it.toInt())
                     if (account != null) {
                         call.respond(account)
                     } else {
@@ -320,8 +320,9 @@ fun Application.configureRouting() {
             get("/budgets") {
                 val params = call.request.queryParameters
                 val userId = params["userId"]?.toInt()
-                userId?.let {
-                    val budgets = BankService.getBudgets(it)
+                val accountId = params["accountId"]?.toInt()
+                if (userId != null && accountId != null) {
+                    val budgets = BankService.getBudgetsAndProjections(userId, accountId)
                     call.respond(budgets)
                 }
             }
@@ -330,6 +331,16 @@ fun Application.configureRouting() {
                 val budget = call.receive(Budget::class)
                 BankService.addBudget(budget)
                 call.respond("OK")
+            }
+
+            delete("/budgets") {
+                val params = call.request.queryParameters
+                val budgetId = params["budgetId"]?.toInt()
+                budgetId?.let {
+                    BankService.deleteBudget(it)
+                    call.respond("Deleted")
+                }
+                call.respond("")
             }
 
         }
