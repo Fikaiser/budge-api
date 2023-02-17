@@ -281,24 +281,21 @@ fun Application.configureRouting() {
                 val tag = params["tag"]
                 val interval = params["interval"]
                 if (tag != null && interval != null) {
-                    // TODO THIS IS WRONG!!!
-
                     var realInterval = ""
                     var outputSize = 0
                     when (interval) {
-                        "day" -> {
-                            realInterval = "1h"
-                            outputSize = 24
-                        }
-                        "week" -> {
-                            realInterval = "1day"
-                            outputSize = 7
-                        }
                         "month" -> {
                             realInterval = "1day"
                             outputSize = 30
                         }
-                        else -> {}
+                        "year" -> {
+                            realInterval = "1day"
+                            outputSize = 356
+                        }
+                        else -> {
+                        realInterval = "1day"
+                        outputSize = 7
+                    }
                     }
                     val history = StockRepository.getStockPriceHistory(tag, realInterval, outputSize)
                     history?.let {
