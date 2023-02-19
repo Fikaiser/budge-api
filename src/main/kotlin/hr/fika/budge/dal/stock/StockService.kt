@@ -52,7 +52,8 @@ object StockService {
     }
 
     private fun generateStockBalance(idPortfolio: Int) {
-        val stock = StockTags.values().toList().shuffled().first()
+        val rand = Random.nextInt(0, StockTags.values().size - 1)
+        val stock = StockTags.values().toList()[rand]
         transaction(DatabaseProvider.provideDb()) {
             SchemaUtils.create(StockBalances)
             DbStocksBalance.new {

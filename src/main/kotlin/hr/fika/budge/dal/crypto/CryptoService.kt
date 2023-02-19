@@ -53,7 +53,8 @@ object CryptoService {
     }
 
     private fun generateCryptoBalance(idWallet: Int) {
-        val coin = CoinTags.values().toList().shuffled().first()
+        val rand = Random.nextInt(0, CoinTags.values().size - 1)
+        val coin = CoinTags.values().toList()[rand]
         transaction(DatabaseProvider.provideDb()) {
             SchemaUtils.create(CryptoBalances)
             DbCryptoBalance.new {
