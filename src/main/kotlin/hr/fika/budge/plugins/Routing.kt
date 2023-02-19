@@ -112,7 +112,7 @@ fun Application.configureRouting() {
                 }
                 call.respondText("Added")
             } else {
-                call.respondText("Failed")
+                call.respondText("")
             }
         }
 
